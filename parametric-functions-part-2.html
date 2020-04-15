@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Parametric functions</title>
+  <meta charset="utf-8">
+  <link rel="stylesheet" type="text/css" href="style.css"/>
+</head>
+<body>
+<textarea id="source">
+
+class: center, middle
+
+# Parametric functions - Part 2
+
+---
+# Interpretation
+
+<br>
+
+```scala
+def map[From, To](list: List[From], update: From => To): List[To]
+```
+
+
+--
+
+<br>
+
+.medium[
+1. A parametric function can handle any types
+
+1. All types must be treated .hl[IN THE SAME WAY]
+]
+
+---
+# All types must be treated in the same way
+
+<br>
+<br>
+
+```scala
+def map[From, To](list: List[From], update: From => To): List[To] =
+  list match {
+    case ints   : List[Int]    => ...
+    case strings: List[String] => ...
+    case users  : List[User]   => ...
+    case _                     => ...
+  }
+```
+
+---
+# All types must be treated in the same way
+
+<br>
+
+
+.pull-left[
+```scala
+def show[A](value: A): String =
+  value match {
+    case x: String => x
+    case x: Double => truncate(2, x)
+    case _         => "N/A"
+  }
+```
+]
+.pull-right[
+```scala
+show("Hello")
+// res0: String = "Hello"
+show(123.123456)
+// res1: String = "123.12"
+show(true)
+// res2: String = "N/A"
+```
+]
+
+---
+class: medium-code
+# Why? Type erasure
+
+<br>
+
+.large-left[
+
+```scala
+def show[A](value: A): String =
+  value match {
+    case x: String       => x
+    case x: Double       => truncate(2, x)
+    case x: List[String] => x.toString
+    case x: List[Double] => x.map(truncate(2, _)).toString
+    case _               => "N/A"
+  }
+```
+]
+
+.medium-right[
+```scala
+show("Hello")
+// res4: String = "Hello"
+show(123.123456)
+// res5: String = "123.12"
+show(true)
+// res6: String = "N/A"
+show(List("Hello", "World"))
+// res7: String = "List(Hello, World)"
+```
+]
+
+<br><br><br><br><br><br><br><br><br>
+
+```scala
+show(List(123.123456, 0.1234))
+// res8: String = "List(123.123456, 0.1234)"
+```
+
+---
+class: medium-code
+# Why? Type erasure
+
+<br>
+
+.large-left[
+```scala
+def show[A](value: A): String =
+  value match {
+    case x: String    => x
+    case x: Double    => truncate(2, x)
+    case x: List[Any] => x.toString
+    case x: List[Any] => x.map(truncate(2, _)).toString
+    case _            => "N/A"
+  }
+```
+]
+
+.medium-right[
+```scala
+show("Hello")
+// res9: String = "Hello"
+show(123.123456)
+// res10: String = "123.12"
+show(true)
+// res11: String = "N/A"
+show(List("Hello", "World"))
+// res12: String = "List(Hello, World)"
+```
+]
+
+<br><br><br><br><br><br><br><br><br>
+
+```scala
+show(List(123.123456, 0.1234))
+// res13: String = "List(123.123456, 0.1234)"
+```
+
+
+---
+class: medium-code
+
+# Why? Bad documentation
+
+<br>
+
+.large-left[
+```scala
+def show[A](value: A): String =
+  value match {
+    case x: String       => x
+    case x: Double       => truncate(2, x)
+    case x: List[String] => x.toString
+    case x: List[Double] => x.map(truncate(2, _)).toString
+    case _               => "N/A"
+  }
+```
+]
+
+---
+class: medium-code
+
+# Solution 1: Overloaded functions
+
+<br>
+
+.pull-left[
+
+```scala
+def show(value: String): String =
+  value
+
+def show(value: Double): String =
+  truncate(2, value)
+
+def defaultShow[A](value: A): String =
+  "N/A"
+```
+]
+
+.pull-right[
+```scala
+show("Hello")
+// res15: String = "Hello"
+show(123.123456)
+// res16: String = "123.12"
+defaultShow(true)
+// res17: String = "N/A"
+```
+]
+
+--
+
+<br><br><br><br><br><br><br><br><br>
+
+```scala
+def show(value: List[String]): String = ???
+def show(value: List[Double]): String = ???
+// error: double definition:
+// def show(value: List[String]): String at line 64 and
+// def show(value: List[Double]): String at line 65
+// have same type after erasure: (value: List)String
+// def show(value: List[Double]): String = ???
+// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+---
+class: medium-code
+
+# Solution 2: Enumeration
+
+```scala
+sealed trait ShowValue
+case class ShowString(value: String) extends ShowValue
+case class ShowDouble(value: Double) extends ShowValue
+case class ShowStrings(value: List[String]) extends ShowValue
+case class ShowDoubles(value: List[Double]) extends ShowValue
+case class ShowDefault[A](value: A) extends ShowValue
+
+def show(value: ShowValue): String =
+  value match {
+    case ShowString(x)  => x
+    case ShowDouble(x)  => truncate(2, x)
+    case ShowStrings(x) => x.toString
+    case ShowDoubles(x) => x.map(truncate(2, _)).toString
+    case ShowDefault(_) => "N/A"
+  }
+```
+
+```scala
+show(ShowStrings(List("Hello", "World")))
+// res19: String = "List(Hello, World)"
+show(ShowDoubles(List(123.123456, 0.1234)))
+// res20: String = "List(123.12, 0.12)"
+```
+
+---
+class: medium-code
+
+# Solution 2: Enumeration (Dotty)
+
+```scala
+enum ShowValue {
+  case class ShowString(value: String)
+  case class ShowDouble(value: Double)
+  case class ShowStrings(value: List[String])
+  case class ShowDoubles(value: List[Double])
+  case class ShowDefault[A](value: A)
+}
+
+def show(value: ShowValue): String =
+  value match {
+    case ShowString(x)  => x
+    case ShowDouble(x)  => truncate(2, x)
+    case ShowStrings(x) => x.toString
+    case ShowDoubles(x) => x.map(truncate(2, _)).toString
+    case ShowDefault(_) => "N/A"
+  }
+```
+
+```scala
+show(ShowStrings(List("Hello", "World")))
+// res21: String = "List(Hello, World)"
+show(ShowDoubles(List(123.123456, 0.1234)))
+// res22: String = "List(123.12, 0.12)"
+```
+
+---
+class: medium-code
+
+# Solution 3: Interface
+
+```scala
+trait Show[A] {
+  def show(value: A): String
+}
+
+val showString: Show[String] = new Show[String] {
+  def show(value: String): String = value
+}
+
+val showDouble: Show[Double] = new Show[Double] {
+  def show(value: Double): String = truncate(2, value)
+}
+
+def showOption[A](showA: Show[A]): Show[Option[A]] = new Show[Option[A]]{
+  def show(value: Option[A]): String =
+    value match {
+      case Some(x) => showA.show(x)
+      case None    => defaultShow.show(value)
+    }
+}
+
+def defaultShow[A]: Show[A] = new Show[A]{
+  def show(value: A): String = "N/A"
+}
+```
+
+
+---
+# How can we implement `map`?
+
+<br>
+
+```scala
+def map[From, To](list: List[From], update: From => To): List[To]
+```
+
+--
+
+<br>
+
+.medium[
+* Always return `List.empty` (`Nil`)
+]
+
+--
+
+.medium[
+* Somehow call `f` on the elements of `list`
+]
+
+---
+# Does it compile?
+
+<br>
+
+```scala
+def map[From, To](list: List[From], update: From => To): List[To] =
+  List(1,2,3)
+```
+
+---
+# Does it compile?
+
+<br>
+
+```scala
+def map[From, To](list: List[From], update: From => To): List[To] =
+  List(1,2,3)
+
+On line 3: error: type mismatch;
+        found   : Int(1)
+        required: To
+```
+
+--
+
+<br>
+
+```scala
+def map(list: List[Int], update: Int => Int): List[Int] =
+  List(1,2,3)
+```
+
+--
+
+<br>
+
+.center[
+## #2 Benefit: require less tests and less documentation
+]
+
+---
+# Summary
+
+<br>
+
+.large[
+* More reusable
+
+* Caller decides which underlying type to use
+
+* Implementation must be generic
+   * more documentation
+   * less tests
+]
+
+---
+class: center, middle
+
+# Exercise 2: Parametric functions
+
+`exercises.function.FunctionExercises.scala`
+
+
+</textarea>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>
+    var slideshow = remark.create({
+        ratio: "16:9",
+        slideNumberFormat: ''
+    });
+</script>
+</body>
+</html>
